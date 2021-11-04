@@ -1,7 +1,9 @@
 const request = require('supertest');
 
 const app = require('../app');
-const User = require('../src/models/user');
+const database = require('../src/database');
+const { User } = require('../src/database/models');
+const { generateAccessToken } = require('../src/services/jwt');
 
 const USERS_PATH = '/users';
 
@@ -19,9 +21,15 @@ const NEW_USER = {
 };
 
 describe('Users routes', () => {
+  let firstUserAccessToken;
+  let secondUserAccessToken;
   beforeAll(async () => {
-    await User.create(FIRST_USER);
-    await User.create(Object.assign(FIRST_USER, { active: false }));
+    await database.init();
+    const firstUser = await User.create(FIRST_USER);
+    firstUserAccessToken = generateAccessToken(firstUser.id);
+
+    const secondUser = await User.create(Object.assign(FIRST_USER, { active: false }));
+    secondUserAccessToken = generateAccessToken(secondUser.id);
   });
 
   it('Should create user', async () => {
@@ -169,5 +177,15 @@ describe('Users routes', () => {
 
     expect(response.statusCode).toBe(400);
     expect(response.body.status).toBe('User not found');
+  });
+  it('Should login with username and password', async () => {
+    const payload = {
+      username: 'myusername',
+      password: '12345',
+    };
+    const response = await request(app).post(`${USERS_PATH}/login`).send(payload);
+    expect(response.statusCode).toBe(200);
+    expect(response.body.status).toBe('success');
+    expect(response.body.data.accessToken).not.toBeNull();
   });
 });

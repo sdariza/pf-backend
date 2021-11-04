@@ -1,33 +1,42 @@
 const ApiError = require('../utils/ApiError');
 
-const User = require('../models/user');
+const { User } = require('../database/models');
+const { generateAccessToken } = require('../services/jwt');
+
 const UserSerializer = require('../serializers/UserSerializer');
+const AuthSerializer = require('../serializers/AuthSerializer');
+
+const findUser = async (where) => {
+  Object.assign(where, { active: true });
+
+  const user = await User.findOne({ where });
+  if (!user) {
+    throw new ApiError('User not found', 400);
+  }
+
+  return user;
+};
 
 const createUser = async (req, res, next) => {
   try {
     const { body } = req;
-    // console.log(body);
-    const {
-      username, email, name, password, passwordConfirmation,
-    } = body;
 
-    if (password !== passwordConfirmation) {
+    if (body.password !== body.passwordConfirmation) {
       throw new ApiError('Passwords do not match', 400);
     }
 
-    if (
-      (name === undefined || name.length === 0)
-      || (username === undefined || username.length === 0)
-      || (password === undefined === password === 0)
-      || (email === undefined || email.length === 0)
-    ) { throw new ApiError('Payload must contain name, username, email and password', 400); }
+    const userPayload = {
+      username: body.username,
+      email: body.email,
+      name: body.name,
+      password: body.password,
+    };
 
-    const user = await User.create({
-      username,
-      email,
-      name,
-      password,
-    });
+    if (Object.values(userPayload).some((val) => val === undefined)) {
+      throw new ApiError('Payload must contain name, username, email and password', 400);
+    }
+
+    const user = await User.create(userPayload);
 
     res.json(new UserSerializer(user));
   } catch (err) {
@@ -38,10 +47,8 @@ const createUser = async (req, res, next) => {
 const getUserById = async (req, res, next) => {
   try {
     const { params } = req;
-    // console.log(params);
-    const user = await User.findOne({ where: { id: params.id } });
-    // console.log(user);
-    if (user === undefined || user.active === false) throw new ApiError('User not found', 400);
+
+    const user = await findUser({ id: Number(params.id) });
 
     res.json(new UserSerializer(user));
   } catch (err) {
@@ -49,31 +56,27 @@ const getUserById = async (req, res, next) => {
   }
 };
 
-function hasSameProps(obj1, obj2) {
-  return Object.keys(obj1).every((prop) => Object.hasOwnProperty.call(obj2, prop));
-}
-
 const updateUser = async (req, res, next) => {
   try {
-    const { params } = req;
-    const { body } = req;
+    const { params, body } = req;
 
-    const { username, name, email } = body;
-    const idealObject = { username, name, email };
+    const userId = Number(params.id);
 
-    const userQuery = await User.findOne({ where: { id: params.id } });
-    if (userQuery.active === false) throw new ApiError('User not found', 400);
-    if (!hasSameProps(idealObject, body)) throw new ApiError('Payload can only contain username, email or name', 400);
-    // console.log(params.id);
+    const user = await findUser({ id: userId });
 
-    const user = await User.update(
-      { where: { id: params.id } },
-      {
-        username,
-        name,
-        email,
-      },
-    );
+    const userPayload = {
+      username: body.username,
+      email: body.email,
+      name: body.name,
+    };
+
+    if (Object.values(userPayload).some((val) => val === undefined)) {
+      throw new ApiError('Payload can only contain username, email or name', 400);
+    }
+
+    Object.assign(user, userPayload);
+
+    await user.save();
 
     res.json(new UserSerializer(user));
   } catch (err) {
@@ -84,22 +87,34 @@ const updateUser = async (req, res, next) => {
 const deactivateUser = async (req, res, next) => {
   try {
     const { params } = req;
-    // revisar si el usuario existe
 
-    const existUser = await User.findOne({ where: { id: params.id } });
+    const userId = Number(params.id);
 
-    // console.log(existUser);
+    const user = await findUser({ id: userId });
 
-    if (existUser?.active === false || existUser === undefined) throw new ApiError('User not found', 400);
+    Object.assign(user, { active: false });
 
-    const user = await User.update(
-      { where: { id: params.id } },
-      {
-        active: false,
-      },
-    );
+    await user.save();
 
     res.json(new UserSerializer(null));
+  } catch (err) {
+    next(err);
+  }
+};
+
+const loginUser = async (req, res, next) => {
+  try {
+    const { body } = req;
+
+    const user = await findUser({ username: body.username });
+
+    if (body.password !== user.password) {
+      throw new ApiError('User not found', 400);
+    }
+
+    const accessToken = generateAccessToken(user.id);
+
+    res.json(new AuthSerializer(accessToken));
   } catch (err) {
     next(err);
   }
@@ -110,4 +125,5 @@ module.exports = {
   getUserById,
   updateUser,
   deactivateUser,
+  loginUser,
 };
