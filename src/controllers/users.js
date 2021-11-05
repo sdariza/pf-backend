@@ -5,6 +5,9 @@ const { generateAccessToken } = require('../services/jwt');
 
 const UserSerializer = require('../serializers/UserSerializer');
 const AuthSerializer = require('../serializers/AuthSerializer');
+const UsersSerializer = require('../serializers/UsersSerializer');
+
+const { ROLES } = require('../config/constants');
 
 const findUser = async (where) => {
   Object.assign(where, { active: true });
@@ -15,6 +18,18 @@ const findUser = async (where) => {
   }
 
   return user;
+};
+
+const getAllUsers = async (req, res, next) => {
+  try {
+    req.isRole(ROLES.admin);
+
+    const users = await User.findAll();
+
+    res.json(new UsersSerializer(users));
+  } catch (err) {
+    next(err);
+  }
 };
 
 const createUser = async (req, res, next) => {
@@ -61,7 +76,7 @@ const updateUser = async (req, res, next) => {
     const { params, body } = req;
 
     const userId = Number(params.id);
-
+    req.isUserAuthorized(userId);
     const user = await findUser({ id: userId });
 
     const userPayload = {
@@ -89,6 +104,7 @@ const deactivateUser = async (req, res, next) => {
     const { params } = req;
 
     const userId = Number(params.id);
+    req.isUserAuthorized(userId);
 
     const user = await findUser({ id: userId });
 
@@ -126,4 +142,5 @@ module.exports = {
   updateUser,
   deactivateUser,
   loginUser,
+  getAllUsers,
 };
