@@ -7,8 +7,8 @@ const { JWT_SECRET } = require('../config');
  * @param {Number} id Userid
  * @returns {String}
  */
-function generateAccessToken(id, username) {
-  return jwt.sign({ id, username }, JWT_SECRET, { expiresIn: '1d' });
+function generateAccessToken(id) {
+  return jwt.sign({ id }, JWT_SECRET, { expiresIn: '1d' });
 }
 
 /**
