@@ -129,7 +129,7 @@ describe('Users routes', () => {
       .put(`${USERS_PATH}/${USER_ID}`)
       .set('Authorization', `bearer ${firstUserAccessToken}`)
       .send(payload);
-
+    // console.log(response);
     expect(response.statusCode).toBe(200);
     expect(response.body.status).toBe('success');
 
@@ -204,7 +204,6 @@ describe('Users routes', () => {
       password: '12345',
     };
     const response = await request(app).post(`${USERS_PATH}/login`).send(payload);
-
     expect(response.statusCode).toBe(200);
     expect(response.body.status).toBe('success');
     expect(response.body.data.accessToken).not.toBeNull();

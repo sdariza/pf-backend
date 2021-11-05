@@ -9,14 +9,11 @@ const UsersSerializer = require('../serializers/UsersSerializer');
 
 const { ROLES } = require('../config/constants');
 
-const findUser = async (where) => {
-  Object.assign(where, { active: true });
-
-  const user = await User.findOne({ where });
+const findUser = async (whereClause) => {
+  const user = await User.findOne({ where: Object.assign(whereClause, { active: true }) });
   if (!user) {
     throw new ApiError('User not found', 400);
   }
-
   return user;
 };
 
@@ -77,6 +74,7 @@ const updateUser = async (req, res, next) => {
 
     const userId = Number(params.id);
     req.isUserAuthorized(userId);
+
     const user = await findUser({ id: userId });
 
     const userPayload = {
@@ -123,12 +121,11 @@ const loginUser = async (req, res, next) => {
     const { body } = req;
 
     const user = await findUser({ username: body.username });
-
-    if (body.password !== user.password) {
+    if (!(await user.comparePassword(body.password))) {
       throw new ApiError('User not found', 400);
     }
 
-    const accessToken = generateAccessToken(user.id);
+    const accessToken = generateAccessToken(user.id, user.role);
 
     res.json(new AuthSerializer(accessToken));
   } catch (err) {
