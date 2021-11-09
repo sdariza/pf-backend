@@ -1,10 +1,12 @@
 const request = require('supertest');
 
 const app = require('../app');
-const database = require('../src/database');
-const { User } = require('../src/database/models');
+
 const { ROLES } = require('../src/config/constants');
 const { generateAccessToken } = require('../src/services/jwt');
+
+const database = require('../src/database');
+const { User } = require('../src/database/models');
 
 const USERS_PATH = '/users';
 
@@ -30,10 +32,11 @@ describe('Users routes', () => {
     await database.init();
 
     const firstUser = await User.create(FIRST_USER);
-    firstUserAccessToken = generateAccessToken(firstUser.id);
+    firstUserAccessToken = generateAccessToken(firstUser.id, firstUser.role);
 
     const secondUser = await User.create(Object.assign(FIRST_USER, { active: false }));
-    secondUserAccessToken = generateAccessToken(secondUser.id);
+    secondUserAccessToken = generateAccessToken(secondUser.id, secondUser.role);
+
     const adminUser = await User.create(Object.assign(FIRST_USER, { role: ROLES.admin }));
     adminUserAccessToken = generateAccessToken(adminUser.id, adminUser.role);
   });
@@ -59,6 +62,8 @@ describe('Users routes', () => {
     expect(response.body.data.password).toBeUndefined();
     expect(response.body.data.passwordConfirmation).toBeUndefined();
     expect(response.body.data.active).toBeUndefined();
+
+    expect(response.body.paginationInfo).toBeNull();
   });
 
   it('Should return bad request on create user with invalid payload', async () => {
@@ -100,6 +105,8 @@ describe('Users routes', () => {
 
     expect(response.body.data.password).toBeUndefined();
     expect(response.body.data.active).toBeUndefined();
+
+    expect(response.body.paginationInfo).toBeNull();
   });
 
   it('Should return bad request when user does not exist', async () => {
@@ -129,7 +136,7 @@ describe('Users routes', () => {
       .put(`${USERS_PATH}/${USER_ID}`)
       .set('Authorization', `bearer ${firstUserAccessToken}`)
       .send(payload);
-    // console.log(response);
+
     expect(response.statusCode).toBe(200);
     expect(response.body.status).toBe('success');
 
@@ -142,6 +149,8 @@ describe('Users routes', () => {
 
     expect(response.body.data.password).toBeUndefined();
     expect(response.body.data.active).toBeUndefined();
+
+    expect(response.body.paginationInfo).toBeNull();
   });
 
   it('Should return unauthorized on update deactivated user', async () => {
@@ -204,6 +213,7 @@ describe('Users routes', () => {
       password: '12345',
     };
     const response = await request(app).post(`${USERS_PATH}/login`).send(payload);
+
     expect(response.statusCode).toBe(200);
     expect(response.body.status).toBe('success');
     expect(response.body.data.accessToken).not.toBeNull();
@@ -217,6 +227,11 @@ describe('Users routes', () => {
     expect(response.statusCode).toBe(200);
     expect(response.body.status).toBe('success');
     expect(response.body.data.length).toBe(4);
+
+    expect(response.body.paginationInfo).not.toBeNull();
+    expect(response.body.paginationInfo.totalItems).toBe(4);
+    expect(response.body.paginationInfo.totalPages).toBe(1);
+    expect(response.body.paginationInfo.currentPage).toBe(1);
 
     expect(response.body.data[0].createdAt).not.toBeNull();
     expect(response.body.data[0].updatedAt).not.toBeNull();

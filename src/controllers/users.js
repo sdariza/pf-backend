@@ -21,9 +21,9 @@ const getAllUsers = async (req, res, next) => {
   try {
     req.isRole(ROLES.admin);
 
-    const users = await User.findAll();
+    const users = await User.findAll({ ...req.pagination });
 
-    res.json(new UsersSerializer(users));
+    res.json(new UsersSerializer(users, await req.getPaginationInfo(User)));
   } catch (err) {
     next(err);
   }
