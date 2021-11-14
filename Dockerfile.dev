@@ -1,11 +1,10 @@
-FROM node:fermium-alpine
+FROM node:fermium-buster-slim
 
 WORKDIR /usr/src/app
 
 EXPOSE 3000
 
-RUN apk add --update python make g++\
-  && rm -rf /var/cache/apk/*
+RUN apt update && apt install -y python make g++
 
 COPY ./package*.json ./
 
